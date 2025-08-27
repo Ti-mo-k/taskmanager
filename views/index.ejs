@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>
+            A todo list
+        </title>
+        <style rel="stylesheet" href="index.css" ></style>
+    <body>
+        <h3>Welcome, <%= name %></h3>
+        <form id="list" action="/todo/add" method="post">
+            <h4> A todo list</h4>
+            <input type="date" name="date" id="task-date" hidden>
+            <input type="text" name="task" placeholder="Enter your todo list">
+            <button type="submit">Add</button>
+        </form>
+
+        <button onclick="window.location.href='view.html'">View my list</button>
+
+        <script src="index.js"></script>
+    </body>
+</html>
