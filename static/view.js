@@ -15,7 +15,6 @@ async function loadTasks() {
             tbody.appendChild(row);
             return;
         }
-
         tasks.forEach(task => {
             const row = document.createElement('tr');
             row.innerHTML = `
