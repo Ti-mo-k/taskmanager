@@ -53,7 +53,7 @@ app.get('/view', (req, res) => {
 });
 
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
    host: process.env.DB_HOST,
    user: process.env.DB_USER,
    password:process.env.DB_PASSWORD,
@@ -62,13 +62,13 @@ const db = mysql.createConnection({
    
     
 })
-db.connect((error) =>{
-    if (error) {
-        console.log('errror', error)
-    } else {
-        console.log('database connection successful')
-    }
-})
+// db.((error) =>{
+//     if (error) {
+//         console.log('errror', error)
+//     } else {
+//         console.log('database connection successful')
+//     }
+// })
 const usersTable= (`
     CREATE TABLE IF NOT EXISTS users(
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -123,12 +123,11 @@ app.post('/todo/register',
     db.query('INSERT INTO users (name,email,password) VALUES (?,?,?)', [name,email,hashedPassword],(error) =>{
         if (error){
             console.error('Error inserting user:', error);
-             res.status(500).send('Server errror')
+             return res.status(500).send('Server error');
         }
-        else{
+        
         // res.status(200).send('User inserted successfully');
         res.redirect('/login')
-        }
 
     })
 
