@@ -69,39 +69,37 @@ const db = mysql.createPool({
 //         console.log('database connection successful')
 //     }
 // })
-const usersTable= (`
-    CREATE TABLE IF NOT EXISTS users(
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL
-    )
-    `)
-db.query(usersTable,(error) =>{
-    if (error) {
-        console.error('Errror creating users table', error)
-    } else {
-        console.log('Users table created')
-    }
-})
-const listTable =(`
-    CREATE TABLE IF NOT EXISTS list(
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    task VARCHAR(255) NOT NULL,
-    task_date DATE DEFAULT (CURDATE()),
-    user_id INT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
 
-    )
-`)
+const promiseDb = db.promise();
 
-db.query(listTable,(error) =>{
-    if (error) {
-        console.log('Error creating list table', error)
-    } else {
-        console.log('List table created successfully')
+async function createTables() {
+    try {
+        await promiseDb.query(`
+            CREATE TABLE IF NOT EXISTS users(
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                password VARCHAR(255) NOT NULL
+            )
+        `);
+        console.log('Users table ready');
+
+        await promiseDb.query(`
+            CREATE TABLE IF NOT EXISTS list(
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                task VARCHAR(255) NOT NULL,
+                task_date DATE DEFAULT (CURDATE()),
+                user_id INT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        `);
+        console.log('List table ready');
+    } catch (err) {
+        console.error('Error creating tables:', err);
     }
-})
+}
+createTables();
+
 app.post('/todo/register', 
     [check('email').isEmail(),check('password').isLength({min:8})], async (req,res) =>{
         const errors = validationResult(req)
@@ -114,13 +112,13 @@ app.post('/todo/register',
             return res.status(400).send("Passwords do not match")
         }
 
-        db.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+        promiseDb.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
             if (err) return res.status(500).send('Database error');
             if (results.length > 0) return res.status(400).json({ error: 'Email already exists' });
         });   
     const hashedPassword = await bcrypt.hash(password,10) 
     
-    db.query('INSERT INTO users (name,email,password) VALUES (?,?,?)', [name,email,hashedPassword],(error) =>{
+    promiseDb.query('INSERT INTO users (name,email,password) VALUES (?,?,?)', [name,email,hashedPassword],(error) =>{
         if (error){
             console.error('Error inserting user:', error);
              return res.status(500).send('Server error');
@@ -135,7 +133,7 @@ app.post('/todo/register',
 
 app.post('/todo/login', async (req, res) => {
     const { email, password } = req.body;
-    db.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+    promiseDb.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
         if (err) {
             console.log(err);
             res.status(500).send('Server error');
@@ -179,7 +177,7 @@ app.post('/todo/add', checkAuth, (req, res) => {
         return res.status(400).send('Task cannot be empty');
     }
 
-    db.query(
+    promiseDb.query(
         'INSERT INTO list (task, task_date, user_id) VALUES (?, ?, ?)',
         [task.trim(), taskDate, userId],
         (error) => {
@@ -196,7 +194,7 @@ app.get('/todo/view',checkAuth, (req, res) => {
     const date = req.query.date;
     const userId = req.session.user.id;
  // format: YYYY-MM-DD
-    db.query('SELECT * FROM list WHERE task_date = ? AND user_id = ?', [date,userId], (err, results) => {
+    promiseDb.query('SELECT * FROM list WHERE task_date = ? AND user_id = ?', [date,userId], (err, results) => {
         if (err) return res.status(500).send('DB error');
         res.json(results);
     });
@@ -213,7 +211,7 @@ app.get('/todo/view',checkAuth, (req, res) => {
 
 app.delete('/todo/delete/:id', (req, res) => {
     const { id } = req.params;
-    db.query('DELETE FROM list WHERE id = ?', [id], (err) => {
+    promiseDb.query('DELETE FROM list WHERE id = ?', [id], (err) => {
         if (err) return res.status(500).send('Delete failed');
         res.sendStatus(200);
     });
@@ -222,7 +220,7 @@ app.delete('/todo/delete/:id', (req, res) => {
 app.put('/todo/update/:id', (req,res) =>{
     const id = req.params.id
     const task = req.body.task
-    db.query(`UPDATE list SET task = ? WHERE id = ?`,[task,id], (error) => {
+    promiseDb.query(`UPDATE list SET task = ? WHERE id = ?`,[task,id], (error) => {
         if (error) {
             return res.status(500).send('Error updating');
         }
