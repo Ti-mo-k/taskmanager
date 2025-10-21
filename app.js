@@ -34,9 +34,10 @@ app.use(bodyParser.urlencoded({extended:true}))
 app.use(express.static(path.join(__dirname,'static')))
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.set('static', path.join(__dirname, 'static'));
 
 
-app.get('/register', (req,res) =>{
+app.get('/', (req,res) =>{
     res.sendFile(path.join(__dirname, 'static', 'register.html'))
 })
 app.get('/login', (req,res) =>{
@@ -56,7 +57,8 @@ const db = mysql.createConnection({
    host: process.env.DB_HOST,
    user: process.env.DB_USER,
    password:process.env.DB_PASSWORD,
-   database:process.env.DB_DATABASE
+   database:process.env.DB_DATABASE,
+   port: process.env.DB_PORT
    
     
 })
@@ -111,6 +113,11 @@ app.post('/todo/register',
     if (password !== confirmPassword) {
             return res.status(400).send("Passwords do not match")
         }
+
+        db.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+            if (err) return res.status(500).send('Database error');
+            if (results.length > 0) return res.status(400).json({ error: 'Email already exists' });
+        });   
     const hashedPassword = await bcrypt.hash(password,10) 
     
     db.query('INSERT INTO users (name,email,password) VALUES (?,?,?)', [name,email,hashedPassword],(error) =>{
@@ -162,18 +169,28 @@ function checkAuth(req,res,next) {
     }
 
 }    
-app.post('/todo/add',checkAuth, (req, res) => {
+app.post('/todo/add', checkAuth, (req, res) => {
     const { task, date } = req.body;
     const userId = req.session.user.id;
-    db.query('INSERT INTO list (task, task_date,user_id) VALUES (?,?,?)', [task, date, userId], (error) => {
-        if (error) {
-            console.log('error inserting into task', error.message)
-            res.status(500).send('Server error')
+
+    // Use today's date if date is missing or empty
+    const taskDate = date && date.trim() !== '' ? date : new Date().toISOString().split('T')[0];
+
+    if (!task || task.trim() === '') {
+        return res.status(400).send('Task cannot be empty');
+    }
+
+    db.query(
+        'INSERT INTO list (task, task_date, user_id) VALUES (?, ?, ?)',
+        [task.trim(), taskDate, userId],
+        (error) => {
+            if (error) {
+                console.log('Error inserting task:', error.message);
+                return res.status(500).send('Server error');
+            }
+            res.status(200).send('Task added successfully');
         }
-        else{
-             res.status(200).send('Task added successfully');
-        }
-    });
+    );
 });
 
 app.get('/todo/view',checkAuth, (req, res) => {
