@@ -15,7 +15,7 @@ dotenv.config();
 
 // session middleware
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: jgyfgjkgngjhbh465478hhfdjhnl567789423601gfk,
     resave: false,
     saveUninitialized: true,
     cookie: {
