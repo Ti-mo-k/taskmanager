@@ -58,7 +58,11 @@ const db = mysql.createPool({
    user: process.env.MYSQL_ADDON_USER,
    password:process.env.MYSQL_ADDON_PASSWORD,
    database:process.env.MYSQL_ADDON_DB,
-   port: process.env.MYSQL_ADDON_PORT
+   port: process.env.MYSQL_ADDON_PORT,
+   waitForConnections: true,
+   connectionLimit: 10,
+   queueLimit: 0,
+
    
     
 })
@@ -101,62 +105,69 @@ async function createTables() {
 createTables();
 
 app.post('/todo/register', 
-    [check('email').isEmail(),check('password').isLength({min:8})], async (req,res) =>{
-        const errors = validationResult(req)
+    [check('email').isEmail(), check('password').isLength({ min: 8 })], 
+    async (req, res) => {
+        const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).send('enter a valid email and a long password')
-        }
-         
-    const {name,email,password,confirmPassword}= req.body
-    if (password !== confirmPassword) {
-            return res.status(400).send("Passwords do not match")
+            return res.status(400).send('Enter a valid email and a long password');
         }
 
-        promiseDb.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
-            if (err) return res.status(500).send('Database error');
-            if (results.length > 0) return res.status(400).json({ error: 'Email already exists' });
-        });   
-    const hashedPassword = await bcrypt.hash(password,10) 
-    
-    promiseDb.query('INSERT INTO users (name,email,password) VALUES (?,?,?)', [name,email,hashedPassword],(error) =>{
-        if (error){
-            console.error('Error inserting user:', error);
-             return res.status(500).send('Server error');
+        const { name, email, password, confirmPassword } = req.body;
+        if (password !== confirmPassword) {
+            return res.status(400).send("Passwords do not match");
         }
-        
-        // res.status(200).send('User inserted successfully');
-        res.redirect('/login')
 
-    })
+        try {
+            // Check if email exists
+            const [existing] = await promiseDb.query('SELECT * FROM users WHERE email = ?', [email]);
+            if (existing.length > 0) {
+                return res.status(400).send('Email already exists');
+            }
 
-    })
+            // Hash password
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Insert user
+            await promiseDb.query('INSERT INTO users (name,email,password) VALUES (?,?,?)', [name, email, hashedPassword]);
+
+            res.redirect('/login');  // send response
+        } catch (err) {
+            console.error('Error during registration:', err);
+            res.status(500).send('Server error');
+        }
+});
+
 
 app.post('/todo/login', async (req, res) => {
     const { email, password } = req.body;
-    promiseDb.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send('Server error');
-            return;
-        }
+
+    try {
+        // 1️⃣ Fetch user by email
+        const [results] = await promiseDb.query('SELECT * FROM users WHERE email = ?', [email]);
 
         if (results.length === 0) {
-            res.status(400).send('Invalid email or password');
-            return;
+            return res.status(400).send('Invalid email or password');
         }
 
         const user = results[0];
-        const isMatch = await bcrypt.compare(password, user.password);
 
+        // 2️⃣ Compare password
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            res.status(400).send('Invalid email or password');
-            return;
+            return res.status(400).send('Invalid email or password');
         }
 
-        req.session.user = { id: user.id, email: user.email, name:user.name };
+        // 3️⃣ Save session
+        req.session.user = { id: user.id, email: user.email, name: user.name };
+
+        // 4️⃣ Redirect to list page
         res.redirect('/list');
-    });
+    } catch (err) {
+        console.error('Error during login:', err);
+        res.status(500).send('Server error');
+    }
 });
+
 function checkAuth(req,res,next) {
     if(!req.session.user){
         return res.redirect('/login');
