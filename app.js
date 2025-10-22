@@ -15,16 +15,17 @@ dotenv.config();
 
 // session middleware
 app.use(session({
-    secret:"klnjfbhfv;kfvblnslk;ldv nlh;b",
-    resave:false,
-    saveUninitialized:true,
-    cookie:{
-        secure:false,
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: process.env.NODE_ENV === "production", // true on HTTPS in production
         maxAge: 30 * 60 * 1000,
-        httpOnly:true
+        httpOnly: true,
+        sameSite: "lax" // allows fetch requests from same origin
     }
+}));
 
-}))
  
 // middleware
 app.use(express.json())
