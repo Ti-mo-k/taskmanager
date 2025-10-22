@@ -3,7 +3,10 @@ async function loadTasks() {
     const date = dateInput.value || new Date().toISOString().split('T')[0]; // today if no date selected
 
     try {
-        const response = await fetch(`/todo/view?date=${date}`);
+        const response = await fetch(`/todo/view?date=${date}`, {
+    credentials: 'include' // important for session cookies
+    });
+
         const tasks = await response.json();
 
         const tbody = document.querySelector('#task-view tbody');
@@ -33,7 +36,7 @@ async function deleteTask(id) {
     if (!confirm('Do you want to delete this task?')) return;
 
     try {
-        await fetch(`/todo/delete/${id}`, { method: 'DELETE' });
+        await fetch(`/todo/delete/${id}`, { method: 'DELETE', credentials: 'include' });
         loadTasks(); // Reload tasks after deletion
     } catch (error) {
         console.error('Error deleting task:', error);
@@ -48,7 +51,8 @@ async function updateTask(id, oldTask) {
         await fetch(`/todo/update/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task: newTask })
+            body: JSON.stringify({ task: newTask }),
+            credentials: 'include'
         });
         loadTasks(); // Reload tasks after update
     } catch (error) {

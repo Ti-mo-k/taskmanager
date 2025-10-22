@@ -168,15 +168,17 @@ app.post('/todo/login', async (req, res) => {
     }
 });
 
-function checkAuth(req,res,next) {
-    if(!req.session.user){
-        return res.redirect('/login');
+function checkAuth(req, res, next) {
+    if (!req.session.user) {
+        if (req.xhr || req.headers.accept.indexOf('json') > -1) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        } else {
+            return res.redirect('/login');
+        }
     }
-    else{
-        next()
-    }
-
-}    
+    next();
+}
+  
 app.post('/todo/add', checkAuth, (req, res) => {
     const { task, date } = req.body;
     const userId = req.session.user.id;
@@ -189,26 +191,37 @@ app.post('/todo/add', checkAuth, (req, res) => {
     }
 
     promiseDb.query(
-        'INSERT INTO list (task, task_date, user_id) VALUES (?, ?, ?)',
-        [task.trim(), taskDate, userId],
-        (error) => {
-            if (error) {
-                console.log('Error inserting task:', error.message);
-                return res.status(500).send('Server error');
-            }
-            res.status(200).send('Task added successfully');
-        }
-    );
+  'INSERT INTO list (task, task_date, user_id) VALUES (?, ?, ?)',
+  [task.trim(), taskDate, userId],
+  (error) => {
+    if (error) {
+      console.log('Error inserting task:', error.message);
+      return res.status(500).json({ error: 'Server error' });
+    }
+    res.status(200).json({ message: 'Task added successfully' });
+  }
+);
+
 });
 
-app.get('/todo/view',checkAuth, (req, res) => {
+app.get('/todo/view', checkAuth, (req, res) => {
     const date = req.query.date;
-    const userId = req.session.user.id;
- // format: YYYY-MM-DD
-    promiseDb.query('SELECT * FROM list WHERE task_date = ? AND user_id = ?', [date,userId], (err, results) => {
-        if (err) return res.status(500).send('DB error');
-        res.json(results);
-    });
+    const userId = req.session.user?.id;
+
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const taskDate = date || new Date().toISOString().split('T')[0];
+
+    promiseDb.query(
+        'SELECT * FROM list WHERE task_date = ? AND user_id = ?',
+        [taskDate, userId],
+        (err, results) => {
+            if (err) return res.status(500).json({ error: 'DB error' });
+            res.json(results);
+        }
+    );
 });
 
 
