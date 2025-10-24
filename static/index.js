@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     "Content-Type": "application/json",
                     "Accept": "application/json" // important for JSON response
                 },
-                body: JSON.stringify({ task, date })
+                body: JSON.stringify({ task, date }),
+                credentials: 'include'
             });
 
             const data = await response.json(); // parse JSON
