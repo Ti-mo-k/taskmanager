@@ -15,16 +15,17 @@ dotenv.config();
 
 // session middleware
 app.use(session({
-    secret: "gyfgjkgngjhbh465478hhfdjhnl567789423601gfk",
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-        secure: process.env.NODE_ENV === "production", // true on HTTPS in production
-        maxAge: 30 * 60 * 1000,
-        httpOnly: true,
-        sameSite: "lax" // allows fetch requests from same origin
-    }
+  secret: "gyfgjkgngjhbh465478hhfdjhnl567789423601gfk",
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 30 * 60 * 1000,
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+  }
 }));
+
 
  
 // middleware
@@ -140,34 +141,32 @@ app.post('/todo/register',
 
 
 app.post('/todo/login', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    try {
-        // 1️⃣ Fetch user by email
-        const [results] = await promiseDb.query('SELECT * FROM users WHERE email = ?', [email]);
+  try {
+    const [results] = await promiseDb.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (results.length === 0) return res.status(400).send('Invalid email or password');
 
-        if (results.length === 0) {
-            return res.status(400).send('Invalid email or password');
-        }
+    const user = results[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).send('Invalid email or password');
 
-        const user = results[0];
+    req.session.user = { id: user.id, email: user.email, name: user.name };
 
-        // 2️⃣ Compare password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).send('Invalid email or password');
-        }
-
-        // 3️⃣ Save session
-        req.session.user = { id: user.id, email: user.email, name: user.name };
-
-        // 4️⃣ Redirect to list page
-        res.redirect('/list');
-    } catch (err) {
-        console.error('Error during login:', err);
-        res.status(500).send('Server error');
-    }
+    // ✅ Ensure session is saved before redirect
+    req.session.save(err => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).send('Error saving session');
+      }
+      res.redirect('/list');
+    });
+  } catch (err) {
+    console.error('Error during login:', err);
+    res.status(500).send('Server error');
+  }
 });
+
 
 function checkAuth(req, res, next) {
     if (!req.session.user) {
